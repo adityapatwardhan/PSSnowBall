@@ -23,6 +23,7 @@ class PSSnowballRunConfig {
     [bool] $IsEnabled
     [AppInsightsTelemetry] $AppInsightsTelemetry
     [System.Collections.Generic.Dictionary[string, string]] $RunEnvironment
+    [string] $PwshPath
 }
 
 function Start-PSSnowballRun {
@@ -30,7 +31,8 @@ function Start-PSSnowballRun {
     param(
         [Parameter(Mandatory)] [string] $InstrumentationKey = "c4df244c-dc9e-4390-b07e-4192f2958769",
         [Parameter()] [UInt64] $MaximumIterationCount = 25,
-        [Parameter()] [UInt64] $MaximumWarmupIterationCount = 5
+        [Parameter()] [UInt64] $MaximumWarmupIterationCount = 5,
+        [Parameter()] [string] $PwshPath
     )
 
     [PSSnowballRunConfig] $script:runConfig = [PSSnowballRunConfig]::new()
@@ -39,6 +41,20 @@ function Start-PSSnowballRun {
     ${script:runConfig}.RunId = New-Guid
     ${script:runConfig}.IsEnabled = $true
     ${script:runConfig}.AppInsightsTelemetry = [AppInsightsTelemetry]::new($InstrumentationKey)
+
+    if ($PwshPath) {
+        if (-not (Test-Path $PwshPath)) {
+            throw "'$PwshPath' does not exist"
+        }
+        else {
+            ${script:runConfig}.PwshPath = $PwshPath
+        }
+    }
+    else {
+        ${script:runConfig}.PwshPath = (Get-Command pwsh).Source
+    }
+
+    Write-Verbose -Verbose "Setting PwshPath as $(${script:runConfig}.PwshPath)"
 
     $psVersionString = $PSVersionTable.PSVersion.ToString()
     $platform = $PSVersionTable.Platform.ToString()
@@ -79,32 +95,35 @@ function Invoke-PSSnowballTest {
 
     $iterationMax = ${script:runConfig}.MaximumIterationCount
     $iterationWarmup = ${script:runConfig}.MaximumWarmupIterationCount
-    $testScriptBlockWarmup = [scriptblock]::Create("for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { $ScriptBlock }")
-    $testScriptBlock = [scriptblock]::Create("for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { $ScriptBlock }")
 
-    Write-Verbose "Starting warmup"
-    Write-Verbose "Test Script $testScriptBlockWarmup"
+    $testScriptBlock = @"
 
-    $null = Measure-Command -Expression $testScriptBlockWarmup
+`$null = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { $ScriptBlock }}
 
-    Write-Verbose "Ending warmup"
+`$currentProcess = [System.Diagnostics.Process]::GetCurrentProcess()
+`$preTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
 
-    Write-Verbose "Starting test"
+`$measurement = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { $ScriptBlock }}
+
+`$currentProcess.Refresh()
+`$postTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
+`$diffProcessorTime = `$postTestProcessorTime - `$preTestProcessorTime
+
+`$avgDuration = `$measurement.TotalMilliseconds / $iterationMax
+`$avgProcessorTime = `$diffProcessorTime / $iterationMax
+
+`$avgDuration
+`$avgProcessorTime
+"@
+
     Write-Verbose "Test Script $testScriptBlock"
 
-    $currentProcess = [System.Diagnostics.Process]::GetCurrentProcess()
-    $preTestProcessorTime = $currentProcess.TotalProcessorTime.TotalMilliseconds
-
-    $measurement = Measure-Command -Expression $testScriptBlock
-
-    $currentProcess.Refresh()
-    $postTestProcessorTime = $currentProcess.TotalProcessorTime.TotalMilliseconds
-    $diffProcessorTime = $postTestProcessorTime - $preTestProcessorTime
+    $testOutput = & (${script:runConfig}.PwshPath) -c $testScriptBlock
 
     Write-Verbose "Ending test"
 
-    $avgDuration = $measurement.TotalMilliseconds / $iterationMax
-    $avgProcessorTime = $diffProcessorTime / $iterationMax
+    $avgDuration = [double]::Parse($testOutput[0])
+    $avgProcessorTime = [double]::Parse($testOutput[1])
 
     $metrics = [System.Collections.Generic.Dictionary[string, double]]::new()
     $metrics.Add('AvgDurationMilliSeconds', $avgDuration)
@@ -116,6 +135,8 @@ function Invoke-PSSnowballTest {
         ${script:runConfig}.AppInsightsTelemetry.TrackEvent($TestName, ${script:runConfig}.RunEnvironment, $metrics)
     }
 
+    Write-Verbose "Return object"
+
     [PSCustomObject]@{
         RunId                        = ${script:runConfig}.RunId
         TestName                     = $TestName
@@ -124,4 +145,6 @@ function Invoke-PSSnowballTest {
         AvgDurationMilliSeconds      = $avgDuration
         AvgProcessorTimeMilliSeconds = $avgProcessorTime
     }
+
+    Write-Verbose "Return object sent"
 }
