@@ -71,7 +71,7 @@ function Stop-PSSnowballRun {
     param(
     )
 
-    ${script:runConfig}.$IsEnabled = $false
+    ${script:runConfig}.IsEnabled = $false
     Write-Verbose ("Stopped run with id {}" -f ${script:runConfig}.RunId)
 }
 
