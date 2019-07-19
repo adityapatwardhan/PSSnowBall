@@ -56,8 +56,9 @@ function Start-PSSnowballRun {
 
     Write-Verbose -Verbose "Setting PwshPath as $(${script:runConfig}.PwshPath)"
 
-    $psVersionString = $PSVersionTable.PSVersion.ToString()
-    $platform = $PSVersionTable.Platform.ToString()
+    $psVersionInfo = & ${script:runConfig}.PwshPath -c { $PSVersionTable.PSVersion.ToString() ; $PSVersionTable.Platform.ToString() }
+    $psVersionString = $psVersionInfo[0]
+    $platform = $psVersionInfo[1]
     ${script:runConfig}.RunEnvironment = [System.Collections.Generic.Dictionary[string, string]]::new()
     ${script:runConfig}.RunEnvironment.Add('PSVersion', $psVersionString)
     ${script:runConfig}.RunEnvironment.Add('RunId', ${script:runConfig}.RunId)
@@ -121,6 +122,8 @@ function Invoke-PSSnowballTest {
     $testOutput = & (${script:runConfig}.PwshPath) -c $testScriptBlock
 
     Write-Verbose "Ending test"
+
+    Write-Verbose "`$testOutput = $testOutput"
 
     $avgDuration = [double]::Parse($testOutput[0])
     $avgProcessorTime = [double]::Parse($testOutput[1])
