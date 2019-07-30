@@ -70,6 +70,15 @@ function Start-PSSnowballRun {
     Write-Verbose ("Started new run with id {0} and iteration count as {1}, warmup iteration count as {2}" -f ${script:runConfig}.RunId, ${script:runConfig}.MaximumIterationCount, ${script:runConfig}.MaximumWarmupIterationCount)
 }
 
+function Invoke-PSSnowballRunInitScript {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)] [scriptblock] $ScriptBlock
+    )
+
+    & (${script:runConfig}.PwshPath) -c $ScriptBlock
+}
+
 function Stop-PSSnowballRun {
     [CmdletBinding()]
     param(
