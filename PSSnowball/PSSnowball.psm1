@@ -30,7 +30,7 @@ function Start-PSSnowballRun {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)] [string] $InstrumentationKey = "c4df244c-dc9e-4390-b07e-4192f2958769",
-        [Parameter()] [UInt64] $MaximumIterationCount = 25,
+        [Parameter()] [UInt64] $MaximumIterationCount = 50,
         [Parameter()] [UInt64] $MaximumWarmupIterationCount = 5,
         [Parameter()] [string] $PwshPath
     )
@@ -56,9 +56,12 @@ function Start-PSSnowballRun {
 
     Write-Verbose -Verbose "Setting PwshPath as $(${script:runConfig}.PwshPath)"
 
-    $psVersionInfo = & ${script:runConfig}.PwshPath -c { $PSVersionTable.PSVersion.ToString() ; $PSVersionTable.Platform.ToString() }
+    $sbPSInfo = { $PSVersionTable.PSVersion.ToString() ; if ($IsWindows) { "Windows"} elseif ($IsLinux) { "Linux" } else { "macOS" } }
+
+    $psVersionInfo = & ${script:runConfig}.PwshPath -c $sbPSInfo
     $psVersionString = $psVersionInfo[0]
     $platform = $psVersionInfo[1]
+
     ${script:runConfig}.RunEnvironment = [System.Collections.Generic.Dictionary[string, string]]::new()
     ${script:runConfig}.RunEnvironment.Add('PSVersion', $psVersionString)
     ${script:runConfig}.RunEnvironment.Add('RunId', ${script:runConfig}.RunId)
