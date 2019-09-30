@@ -99,7 +99,9 @@ function Invoke-PSSnowballTest {
     param(
         [Parameter(Mandatory)] [string] $TestName,
         [Parameter(Mandatory)] [scriptblock] $ScriptBlock,
-        [Parameter()] [switch] $SkipUpload
+        [Parameter()] [switch] $SkipUpload,
+        [Parameter()] [scriptblock] $Setup,
+        [Parameter()] [scriptblock] $TearDown
     )
 
     Test-IsRunEnabled
@@ -111,22 +113,31 @@ function Invoke-PSSnowballTest {
 
     $testScriptBlock = @"
 
-`$null = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { $ScriptBlock }}
+try {
+    ## Setup
+    $Setup
 
-`$currentProcess = [System.Diagnostics.Process]::GetCurrentProcess()
-`$preTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
+    `$null = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { $ScriptBlock }}
 
-`$measurement = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { $ScriptBlock }}
+    `$currentProcess = [System.Diagnostics.Process]::GetCurrentProcess()
+    `$preTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
 
-`$currentProcess.Refresh()
-`$postTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
-`$diffProcessorTime = `$postTestProcessorTime - `$preTestProcessorTime
+    `$measurement = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { $ScriptBlock }}
 
-`$avgDuration = `$measurement.TotalMilliseconds / $iterationMax
-`$avgProcessorTime = `$diffProcessorTime / $iterationMax
+    `$currentProcess.Refresh()
+    `$postTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
+    `$diffProcessorTime = `$postTestProcessorTime - `$preTestProcessorTime
 
-`$avgDuration
-`$avgProcessorTime
+    `$avgDuration = `$measurement.TotalMilliseconds / $iterationMax
+    `$avgProcessorTime = `$diffProcessorTime / $iterationMax
+
+    `$avgDuration
+    `$avgProcessorTime
+}
+finally {
+    ## Clean up
+    $TearDown
+}
 "@
 
     Write-Verbose "Test Script $testScriptBlock"
