@@ -56,7 +56,7 @@ function Start-PSSnowballRun {
 
     Write-Verbose -Verbose "Setting PwshPath as $(${script:runConfig}.PwshPath)"
 
-    $sbPSInfo = { $PSVersionTable.PSVersion.ToString() ; if ($IsWindows) { "Windows"} elseif ($IsLinux) { "Linux" } else { "macOS" } }
+    $sbPSInfo = { $PSVersionTable.PSVersion.ToString() ; if ($IsWindows) { "Windows"} elseif ($IsMacOS) { "macOS" } else { "Linux" } }
 
     $psVersionInfo = & ${script:runConfig}.PwshPath -c $sbPSInfo
     $psVersionString = $psVersionInfo[0]
