@@ -101,7 +101,8 @@ function Invoke-PSSnowballTest {
         [Parameter(Mandatory)] [scriptblock] $ScriptBlock,
         [Parameter()] [switch] $SkipUpload,
         [Parameter()] [scriptblock] $Setup,
-        [Parameter()] [scriptblock] $TearDown
+        [Parameter()] [scriptblock] $TearDown,
+        [Parameter()] [switch] $StartupTest
     )
 
     Test-IsRunEnabled
@@ -111,34 +112,13 @@ function Invoke-PSSnowballTest {
     $iterationMax = ${script:runConfig}.MaximumIterationCount
     $iterationWarmup = ${script:runConfig}.MaximumWarmupIterationCount
 
-    $testScriptBlock = @"
-
-try {
-    ## Setup
-    $Setup
-
-    `$null = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { $ScriptBlock }}
-
-    `$currentProcess = [System.Diagnostics.Process]::GetCurrentProcess()
-    `$preTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
-
-    `$measurement = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { $ScriptBlock }}
-
-    `$currentProcess.Refresh()
-    `$postTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
-    `$diffProcessorTime = `$postTestProcessorTime - `$preTestProcessorTime
-
-    `$avgDuration = `$measurement.TotalMilliseconds / $iterationMax
-    `$avgProcessorTime = `$diffProcessorTime / $iterationMax
-
-    `$avgDuration
-    `$avgProcessorTime
-}
-finally {
-    ## Clean up
-    $TearDown
-}
-"@
+    $testScriptBlock = if ($StartupTest.IsPresent) {
+        $pwshExpandedPath = ${script:runConfig}.PwshPath
+        GetStartTestScripBlock -ScriptBlock $ScriptBlock -Setup $Setup -TearDown $TearDown -iterationWarmup $iterationWarmup -iterationMax $iterationMax -pwshExpandedPath $pwshExpandedPath
+    }
+    else {
+        GetPerfTestScriptBlock -ScriptBlock $ScriptBlock -Setup $Setup -TearDown $TearDown -iterationWarmup $iterationWarmup -iterationMax $iterationMax
+    }
 
     Write-Verbose "Test Script $testScriptBlock"
 
@@ -173,4 +153,63 @@ finally {
     }
 
     Write-Verbose "Return object sent"
+}
+
+function GetPerfTestScriptBlock([ScriptBlock] $ScriptBlock, [scriptblock] $Setup, [scriptblock] $TearDown, $iterationWarmup, $iterationMax)
+{
+    @"
+try {
+    $Setup
+
+    `$null = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { $ScriptBlock }}
+
+    `$null = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { $ScriptBlock }}
+
+    `$currentProcess = [System.Diagnostics.Process]::GetCurrentProcess()
+    `$preTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
+
+    `$measurement = Measure-Command { for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { $ScriptBlock }}
+
+    `$currentProcess.Refresh()
+    `$postTestProcessorTime = `$currentProcess.TotalProcessorTime.TotalMilliseconds
+    `$diffProcessorTime = `$postTestProcessorTime - `$preTestProcessorTime
+
+    `$avgDuration = `$measurement.TotalMilliseconds / $iterationMax
+    `$avgProcessorTime = `$diffProcessorTime / $iterationMax
+
+    `$avgDuration
+    `$avgProcessorTime
+}
+finally {
+    ## Clean up
+    $TearDown
+}
+"@
+}
+
+function GetStartTestScripBlock ([ScriptBlock] $ScriptBlock, [scriptblock] $Setup, [scriptblock] $TearDown, $iterationWarmup, $iterationMax, $pwshExpandedPath)
+{
+    $pwshExpandedPath = ${script:runConfig}.PwshPath
+    @"
+try {
+    $Setup
+
+    for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { `Start-Process -FilePath $pwshExpandedPath -ArgumentList '-noprofile -c `"$ScriptBlock`"' -WindowStyle hidden -Wait" }
+
+    `$procs = @()
+
+    for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { `$procs += Start-Process -FilePath $pwshExpandedPath -ArgumentList '-noprofile -c `"$ScriptBlock`"' -WindowStyle hidden -PassThru -Wait }
+
+    `$totalDuration = @()
+    `$totalDuration += `$procs | ForEach-Object { (`$_.ExitTime - `$_.StartTime).TotalMilliSeconds }
+    `$avgDuration = (`$totalDuration | Measure-Object -Average).Average
+
+    `$avgCPU = (`$procs.CPU | Measure-Object -Average).Average
+    `$avgDuration
+    `$avgCPU
+}
+finally {
+    $TearDown
+}
+"@
 }
