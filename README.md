@@ -26,4 +26,28 @@ $results += Invoke-PSSnowballTest -TestName "GetModuleListAvailable" -ScriptBloc
 
 # Stop run
 Stop-PSSnowballRun
+
+# Results
+$results
+
+RunId                        : 3cff31bf-0952-4536-956f-6a4ace23c91c
+TestName                     : GetHelpNonExistent
+PSVersion                    : 7.1.0
+Platform                     : Windows
+AvgDurationMilliSeconds      : 818.900964
+AvgProcessorTimeMilliSeconds : 823.4375
+
+RunId                        : 3cff31bf-0952-4536-956f-6a4ace23c91c
+TestName                     : GetCommand
+PSVersion                    : 7.1.0
+Platform                     : Windows
+AvgDurationMilliSeconds      : 6.608528
+AvgProcessorTimeMilliSeconds : 6.5625
+
+RunId                        : 3cff31bf-0952-4536-956f-6a4ace23c91c
+TestName                     : GetModuleListAvailable
+PSVersion                    : 7.1.0
+Platform                     : Windows
+AvgDurationMilliSeconds      : 18.23044
+AvgProcessorTimeMilliSeconds : 23.4375
 ```
