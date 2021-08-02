@@ -194,7 +194,7 @@ function GetStartTestScripBlock ([ScriptBlock] $ScriptBlock, [scriptblock] $Setu
 try {
     $Setup
 
-    for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { `Start-Process -FilePath $pwshExpandedPath -ArgumentList '-noprofile -c `"$ScriptBlock`"' -WindowStyle hidden -Wait" }
+    for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { `Start-Process -FilePath $pwshExpandedPath -ArgumentList '-noprofile -c `"$ScriptBlock`"' -WindowStyle hidden -Wait }
 
     `$procs = @()
 
