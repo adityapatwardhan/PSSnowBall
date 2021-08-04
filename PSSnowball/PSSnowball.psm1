@@ -194,11 +194,11 @@ function GetStartTestScripBlock ([ScriptBlock] $ScriptBlock, [scriptblock] $Setu
 try {
     $Setup
 
-    for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { `Start-Process -FilePath $pwshExpandedPath -ArgumentList '-noprofile -c `"$ScriptBlock`"' -WindowStyle hidden -Wait }
+    for(`$iteration = 0; `$iteration -lt $iterationWarmup; `$iteration++) { `Start-Process -FilePath "$pwshExpandedPath" -ArgumentList '-noprofile -c `"$ScriptBlock`"' -Wait }
 
     `$procs = @()
 
-    for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { `$procs += Start-Process -FilePath $pwshExpandedPath -ArgumentList '-noprofile -c `"$ScriptBlock`"' -WindowStyle hidden -PassThru -Wait }
+    for(`$iteration = 0; `$iteration -lt $iterationMax; `$iteration++) { `$procs += Start-Process -FilePath "$pwshExpandedPath" -ArgumentList '-noprofile -c `"$ScriptBlock`"' -PassThru -Wait }
 
     `$totalDuration = @()
     `$totalDuration += `$procs | ForEach-Object { (`$_.ExitTime - `$_.StartTime).TotalMilliSeconds }
